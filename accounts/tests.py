@@ -29,3 +29,44 @@ class RegisterTestCase(APITestCase):
         del payload['password']
         response = self.client.post(self.url, payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AuthTestCase(APITestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username='testuser',
+            email='test@test.com',
+            password='testPass',
+            role='doctor'
+        )
+        self.login_url = reverse('token_obtain_pair')
+        self.refresh_url = reverse('token_refresh')
+
+    def test_login_success(self):
+        response = self.client.post(self.login_url, {
+            'username': 'testuser',
+            'password': 'testPass'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+
+    def test_login_fail_wrong_credentials(self):
+        response = self.client.post(self.login_url, {
+            'username': 'testuser',
+            'password': 'wrongPass'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_token_refresh(self):
+        login_response = self.client.post(self.login_url, {
+            'username': 'testuser',
+            'password': 'testPass'
+        }, format='json')
+
+        refresh_token = login_response.data['refresh']
+        response = self.client.post(self.refresh_url, {
+            'refresh': refresh_token
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
